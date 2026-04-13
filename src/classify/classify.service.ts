@@ -11,12 +11,12 @@ export class ClassifyService {
       const url = `https://api.genderize.io?name=${name}`;
 
       const response = await firstValueFrom(
-        this.httpService.get(url),
+        this.httpService.get(url, { timeout: 5000 }),
       );
 
       const { gender, probability, count } = response.data;
 
-      // Edge case requirement
+      // Edge case handling
       if (!gender || count === 0) {
         throw new HttpException(
           {
@@ -27,21 +27,31 @@ export class ClassifyService {
         );
       }
 
-      const is_confident =
-        probability >= 0.7 && count >= 100;
+      // Ensure correct types
+      const prob = Number(probability);
+      const sample = Number(count);
+
+      // Confidence logic
+      const is_confident = prob >= 0.7 && sample >= 100;
 
       return {
         status: 'success',
         data: {
           name,
           gender,
-          probability,
-          sample_size: count,
+          probability: prob,
+          sample_size: sample,
           is_confident,
           processed_at: new Date().toISOString(),
         },
       };
     } catch (error) {
+      // Preserve known errors (VERY IMPORTANT)
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // Handle unknown/external API errors
       throw new HttpException(
         {
           status: 'error',
@@ -52,6 +62,3 @@ export class ClassifyService {
     }
   }
 }
-
-
-
