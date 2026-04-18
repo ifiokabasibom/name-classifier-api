@@ -3,30 +3,40 @@ import axios from 'axios';
 
 @Injectable()
 export class ExternalService {
-  private async fetchWithRetry(url: string, retries = 2) {
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const res = await axios.get(url, {
-          timeout: 5000,
-        });
+  private async safeGet(url: string) {
+    try {
+      const res = await axios.get(url, {
+        timeout: 4000, // 🔥 critical: prevents hanging requests
+        validateStatus: () => true,
+      });
 
-        return res.data;
-      } catch (err) {
-        if (attempt === retries) {
-          throw new Error(`Failed: ${url}`);
-        }
+      if (!res.data) {
+        throw new Error('Empty response');
       }
+
+      return res.data;
+    } catch (err) {
+      throw new Error(url);
     }
   }
 
   async getGender(name: string) {
     try {
-      return await this.fetchWithRetry(
+      const data = await this.safeGet(
         `https://api.genderize.io?name=${name}`,
       );
+
+      if (!data.gender || data.count === 0) {
+        throw new Error();
+      }
+
+      return data;
     } catch {
       throw new HttpException(
-        { status: 'error', message: 'Genderize returned an invalid response' },
+        {
+          status: 'error',
+          message: 'Genderize returned an invalid response',
+        },
         502,
       );
     }
@@ -34,12 +44,21 @@ export class ExternalService {
 
   async getAge(name: string) {
     try {
-      return await this.fetchWithRetry(
+      const data = await this.safeGet(
         `https://api.agify.io?name=${name}`,
       );
+
+      if (!data.age) {
+        throw new Error();
+      }
+
+      return data;
     } catch {
       throw new HttpException(
-        { status: 'error', message: 'Agify returned an invalid response' },
+        {
+          status: 'error',
+          message: 'Agify returned an invalid response',
+        },
         502,
       );
     }
@@ -47,12 +66,21 @@ export class ExternalService {
 
   async getNationality(name: string) {
     try {
-      return await this.fetchWithRetry(
+      const data = await this.safeGet(
         `https://api.nationalize.io?name=${name}`,
       );
+
+      if (!data.country || data.country.length === 0) {
+        throw new Error();
+      }
+
+      return data;
     } catch {
       throw new HttpException(
-        { status: 'error', message: 'Nationalize returned an invalid response' },
+        {
+          status: 'error',
+          message: 'Nationalize returned an invalid response',
+        },
         502,
       );
     }
