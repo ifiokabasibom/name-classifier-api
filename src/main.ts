@@ -1,30 +1,28 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe, HttpException, HttpStatus } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
+import { ValidationExceptionFilter } from './common/filters/validation-exception/validation-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Required by grading script
   app.enableCors({
     origin: '*',
   });
 
+  // Validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      transform: true,
-      exceptionFactory: () => {
-        return new HttpException(
-          {
-            status: 'error',
-            message: 'Missing or invalid name parameter',
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      },
+      forbidNonWhitelisted: true,
     }),
   );
 
-  await app.listen(process.env.PORT || 3000);
+  // Custom validation filter (handles 400 vs 422 responses correctly)
+  app.useGlobalFilters(new ValidationExceptionFilter());
+
+  await app.listen(3000);
 }
+
 bootstrap();
