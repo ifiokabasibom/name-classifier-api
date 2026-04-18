@@ -1,27 +1,36 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ClassifyModule } from './classify/classify.module';
 import { ProfilesModule } from './profiles/profiles.module';
-import { HttpModule } from '@nestjs/axios';
 import { ExternalModule } from './external/external.module';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60,   // 60 seconds window
+        limit: 10, // max 10 requests
+      },
+    ]),
+
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'profiles.db',
       autoLoadEntities: true,
       synchronize: true,
     }),
-    ClassifyModule, 
+
     ProfilesModule,
-    HttpModule,
-    ExternalModule
+    ExternalModule,
+  ],
+
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}
-
-
-
-
-

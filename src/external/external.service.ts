@@ -1,54 +1,59 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { Injectable, HttpException } from '@nestjs/common';
+import axios from 'axios';
 
 @Injectable()
 export class ExternalService {
-  constructor(private readonly httpService: HttpService) {}
+  private async fetchWithRetry(url: string, retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await axios.get(url, {
+          timeout: 5000,
+        });
 
-  async getNameInsights(name: string) {
-    try {
-      const genderPromise = firstValueFrom(
-        this.httpService.get(`https://api.genderize.io/?name=${name}`),
-      );
-
-      const agePromise = firstValueFrom(
-        this.httpService.get(`https://api.agify.io/?name=${name}`),
-      );
-
-      const nationalityPromise = firstValueFrom(
-        this.httpService.get(`https://api.nationalize.io/?name=${name}`),
-      );
-
-      const [genderRes, ageRes, nationalityRes] = await Promise.all([
-        genderPromise,
-        agePromise,
-        nationalityPromise,
-      ]);
-
-      if (!genderRes.data || !ageRes.data || !nationalityRes.data) {
-        throw new HttpException(
-          {
-            status: 'error',
-            message: 'Invalid upstream response',
-          },
-          HttpStatus.BAD_GATEWAY,
-        );
+        return res.data;
+      } catch (err) {
+        if (attempt === retries) {
+          throw new Error(`Failed: ${url}`);
+        }
       }
+    }
+  }
 
-      return {
-        gender: genderRes.data.gender,
-        probability: genderRes.data.probability,
-        age: ageRes.data.age,
-        nationality: nationalityRes.data.country,
-      };
-    } catch (error) {
+  async getGender(name: string) {
+    try {
+      return await this.fetchWithRetry(
+        `https://api.genderize.io?name=${name}`,
+      );
+    } catch {
       throw new HttpException(
-        {
-          status: 'error',
-          message: 'External API failure',
-        },
-        HttpStatus.BAD_GATEWAY,
+        { status: 'error', message: 'Genderize returned an invalid response' },
+        502,
+      );
+    }
+  }
+
+  async getAge(name: string) {
+    try {
+      return await this.fetchWithRetry(
+        `https://api.agify.io?name=${name}`,
+      );
+    } catch {
+      throw new HttpException(
+        { status: 'error', message: 'Agify returned an invalid response' },
+        502,
+      );
+    }
+  }
+
+  async getNationality(name: string) {
+    try {
+      return await this.fetchWithRetry(
+        `https://api.nationalize.io?name=${name}`,
+      );
+    } catch {
+      throw new HttpException(
+        { status: 'error', message: 'Nationalize returned an invalid response' },
+        502,
       );
     }
   }

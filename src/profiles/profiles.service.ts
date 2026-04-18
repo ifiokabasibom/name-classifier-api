@@ -7,15 +7,16 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import axios from 'axios';
 import { ProfileEntity } from './profile.entity/profile.entity';
 import { uuidv7 } from 'uuidv7';
+import { ExternalService } from '../external/external.service';
 
 @Injectable()
 export class ProfilesService {
   constructor(
     @InjectRepository(ProfileEntity)
     private readonly profileRepo: Repository<ProfileEntity>,
+    private readonly externalService: ExternalService,
   ) {}
 
   private getAgeGroup(age: number): string {
@@ -52,7 +53,7 @@ export class ProfilesService {
   }
 
   async createProfile(name: any) {
-    if (name === undefined || name === null || name === '') {
+    if (!name) {
       throw new BadRequestException({
         status: 'error',
         message: 'Missing or empty name',
@@ -80,24 +81,11 @@ export class ProfilesService {
       };
     }
 
-    let genderData, ageData, nationalityData;
-
-    try {
-      const [gRes, aRes, nRes] = await Promise.all([
-        axios.get(`https://api.genderize.io?name=${normalizedName}`),
-        axios.get(`https://api.agify.io?name=${normalizedName}`),
-        axios.get(`https://api.nationalize.io?name=${normalizedName}`),
-      ]);
-
-      genderData = gRes.data;
-      ageData = aRes.data;
-      nationalityData = nRes.data;
-    } catch {
-      throw new HttpException(
-        { status: 'error', message: 'Upstream service failure' },
-        502,
-      );
-    }
+    // ✅ SAFE EXTERNAL CALLS (NO MORE FAILING AFTER 30 REQUESTS)
+    const genderData = await this.externalService.getGender(normalizedName);
+    const ageData = await this.externalService.getAge(normalizedName);
+    const nationalityData =
+      await this.externalService.getNationality(normalizedName);
 
     if (!genderData.gender || genderData.count === 0) {
       throw new HttpException(
@@ -145,23 +133,23 @@ export class ProfilesService {
   }
 
   async getAllProfiles(query: any) {
-    const { gender, country_id, age_group } = query;
-
     const qb = this.profileRepo.createQueryBuilder('profile');
 
-    if (gender) {
-      qb.andWhere('LOWER(profile.gender) = LOWER(:gender)', { gender });
-    }
-
-    if (country_id) {
-      qb.andWhere('LOWER(profile.country_id) = LOWER(:country_id)', {
-        country_id,
+    if (query.gender) {
+      qb.andWhere('LOWER(profile.gender) = LOWER(:gender)', {
+        gender: query.gender,
       });
     }
 
-    if (age_group) {
+    if (query.country_id) {
+      qb.andWhere('LOWER(profile.country_id) = LOWER(:country_id)', {
+        country_id: query.country_id,
+      });
+    }
+
+    if (query.age_group) {
       qb.andWhere('LOWER(profile.age_group) = LOWER(:age_group)', {
-        age_group,
+        age_group: query.age_group,
       });
     }
 
