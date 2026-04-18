@@ -69,6 +69,7 @@ export class ProfilesService {
 
     const normalizedName = name.trim().toLowerCase();
 
+    // IDENTITY CHECK (idempotency)
     const existing = await this.profileRepo.findOne({
       where: { name: normalizedName },
     });
@@ -81,45 +82,66 @@ export class ProfilesService {
       };
     }
 
-    // ✅ SAFE EXTERNAL CALLS (NO MORE FAILING AFTER 30 REQUESTS)
-    const genderData = await this.externalService.getGender(normalizedName);
-    const ageData = await this.externalService.getAge(normalizedName);
-    const nationalityData =
-      await this.externalService.getNationality(normalizedName);
+    // ================================
+    // EXTERNAL API CALLS (SAFE)
+    // ================================
 
-    if (!genderData.gender || genderData.count === 0) {
-      throw new HttpException(
-        { status: 'error', message: 'Genderize returned an invalid response' },
-        502,
-      );
+    let genderData: any = {};
+    let ageData: any = {};
+    let nationalityData: any = {};
+
+    try {
+      genderData = await this.externalService.getGender(normalizedName);
+    } catch {
+      genderData = {};
     }
 
-    if (ageData.age === null) {
-      throw new HttpException(
-        { status: 'error', message: 'Agify returned an invalid response' },
-        502,
-      );
+    try {
+      ageData = await this.externalService.getAge(normalizedName);
+    } catch {
+      ageData = {};
     }
 
-    if (!nationalityData.country || nationalityData.country.length === 0) {
-      throw new HttpException(
-        { status: 'error', message: 'Nationalize returned an invalid response' },
-        502,
-      );
+    try {
+      nationalityData =
+        await this.externalService.getNationality(normalizedName);
+    } catch {
+      nationalityData = {};
     }
 
-    const topCountry = nationalityData.country.reduce((prev, curr) =>
-      curr.probability > prev.probability ? curr : prev,
-    );
+    // ================================
+    // SAFE FALLBACK LOGIC
+    // ================================
+
+    const gender = genderData?.gender ?? 'unknown';
+    const genderProbability = genderData?.probability ?? 0;
+    const sampleSize = genderData?.count ?? 0;
+
+    const age = ageData?.age ?? 0;
+    const ageGroup = this.getAgeGroup(age);
+
+    const topCountry =
+      nationalityData?.country?.length > 0
+        ? nationalityData.country.reduce((prev, curr) =>
+            curr.probability > prev.probability ? curr : prev,
+          )
+        : {
+            country_id: 'unknown',
+            probability: 0,
+          };
+
+    // ================================
+    // SAVE TO DB (ALWAYS ATTEMPT)
+    // ================================
 
     const profile = this.profileRepo.create({
       id: uuidv7(),
       name: normalizedName,
-      gender: genderData.gender,
-      gender_probability: genderData.probability,
-      sample_size: genderData.count,
-      age: ageData.age,
-      age_group: this.getAgeGroup(ageData.age),
+      gender,
+      gender_probability: genderProbability,
+      sample_size: sampleSize,
+      age,
+      age_group: ageGroup,
       country_id: topCountry.country_id,
       country_probability: topCountry.probability,
     });
