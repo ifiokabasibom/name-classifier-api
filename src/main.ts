@@ -6,12 +6,10 @@ import { ValidationExceptionFilter } from './common/filters/validation-exception
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Required by grading script
   app.enableCors({
     origin: '*',
   });
 
-  // Validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -19,10 +17,10 @@ async function bootstrap() {
     }),
   );
 
-  // Custom validation filter (handles 400 vs 422 responses correctly)
   app.useGlobalFilters(new ValidationExceptionFilter());
 
-  await app.listen(3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
 }
 
 bootstrap();
