@@ -1,35 +1,48 @@
-import { Entity, Column, PrimaryColumn, CreateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryColumn,
+  CreateDateColumn,
+  Index,
+} from 'typeorm';
 
 @Entity('profiles')
 export class ProfileEntity {
-  @PrimaryColumn()
+  @PrimaryColumn('uuid')
   id: string;
 
-  @Index({ unique: true })
-  @Column()
+  @Index()
+  @Column({ unique: true })
   name: string;
 
+  @Index()
   @Column()
   gender: string;
 
   @Column('real')
   gender_probability: number;
 
-  @Column()
-  sample_size: number;
-
-  @Column()
+  @Index()
+  @Column('int')
   age: number;
 
+  @Index()
   @Column()
   age_group: string;
 
-  @Column()
+  @Index()
+  @Column({ length: 2 })
   country_id: string;
+
+  @Column()
+  country_name: string;
 
   @Column('real')
   country_probability: number;
 
-  @CreateDateColumn()
+  @Index()
+  @CreateDateColumn({
+    type: 'timestamp',
+  })
   created_at: Date;
 }

@@ -1,0 +1,27 @@
+export const COUNTRY_MAP: Record<
+  string,
+  { id: string; name: string }
+> = {
+  nigeria: { id: 'NG', name: 'Nigeria' },
+  kenya: { id: 'KE', name: 'Kenya' },
+  angola: { id: 'AO', name: 'Angola' },
+  benin: { id: 'BJ', name: 'Benin' },
+  ghana: { id: 'GH', name: 'Ghana' },
+  cameroon: { id: 'CM', name: 'Cameroon' },
+  togo: { id: 'TG', name: 'Togo' },
+  senegal: { id: 'SN', name: 'Senegal' },
+  egypt: { id: 'EG', name: 'Egypt' },
+  "south africa": { id: 'ZA', name: 'South Africa' },
+  uganda: { id: 'UG', name: 'Uganda' },
+  tanzania: { id: 'TZ', name: 'Tanzania' },
+  rwanda: { id: 'RW', name: 'Rwanda' },
+  ethiopia: { id: 'ET', name: 'Ethiopia' },
+  morocco: { id: 'MA', name: 'Morocco' },
+  algeria: { id: 'DZ', name: 'Algeria' },
+  tunisia: { id: 'TN', name: 'Tunisia' },
+  "ivory coast": { id: 'CI', name: 'Ivory Coast' },
+  "cote d'ivoire": { id: 'CI', name: 'Ivory Coast' },
+  mali: { id: 'ML', name: 'Mali' },
+  "burkina faso": { id: 'BF', name: 'Burkina Faso' },
+  niger: { id: 'NE', name: 'Niger' },
+};

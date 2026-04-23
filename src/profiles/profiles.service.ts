@@ -2,7 +2,6 @@ import {
   Injectable,
   BadRequestException,
   UnprocessableEntityException,
-  HttpException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -32,23 +31,12 @@ export class ProfilesService {
       name: profile.name,
       gender: profile.gender,
       gender_probability: profile.gender_probability,
-      sample_size: profile.sample_size,
       age: profile.age,
       age_group: profile.age_group,
       country_id: profile.country_id,
+      country_name: profile.country_name,
       country_probability: profile.country_probability,
       created_at: profile.created_at.toISOString(),
-    };
-  }
-
-  private formatList(profile: ProfileEntity) {
-    return {
-      id: profile.id,
-      name: profile.name,
-      gender: profile.gender,
-      age: profile.age,
-      age_group: profile.age_group,
-      country_id: profile.country_id,
     };
   }
 
@@ -63,13 +51,12 @@ export class ProfilesService {
     if (typeof name !== 'string') {
       throw new UnprocessableEntityException({
         status: 'error',
-        message: 'Invalid type',
+        message: 'Invalid parameter type',
       });
     }
 
     const normalizedName = name.trim().toLowerCase();
 
-    // IDENTITY CHECK (idempotency)
     const existing = await this.profileRepo.findOne({
       where: { name: normalizedName },
     });
@@ -82,40 +69,25 @@ export class ProfilesService {
       };
     }
 
-    // ================================
-    // EXTERNAL API CALLS (SAFE)
-    // ================================
-
     let genderData: any = {};
     let ageData: any = {};
     let nationalityData: any = {};
 
     try {
       genderData = await this.externalService.getGender(normalizedName);
-    } catch {
-      genderData = {};
-    }
+    } catch {}
 
     try {
       ageData = await this.externalService.getAge(normalizedName);
-    } catch {
-      ageData = {};
-    }
+    } catch {}
 
     try {
       nationalityData =
         await this.externalService.getNationality(normalizedName);
-    } catch {
-      nationalityData = {};
-    }
-
-    // ================================
-    // SAFE FALLBACK LOGIC
-    // ================================
+    } catch {}
 
     const gender = genderData?.gender ?? 'unknown';
     const genderProbability = genderData?.probability ?? 0;
-    const sampleSize = genderData?.count ?? 0;
 
     const age = ageData?.age ?? 0;
     const ageGroup = this.getAgeGroup(age);
@@ -127,22 +99,19 @@ export class ProfilesService {
           )
         : {
             country_id: 'unknown',
+            country_name: 'unknown',
             probability: 0,
           };
-
-    // ================================
-    // SAVE TO DB (ALWAYS ATTEMPT)
-    // ================================
 
     const profile = this.profileRepo.create({
       id: uuidv7(),
       name: normalizedName,
       gender,
       gender_probability: genderProbability,
-      sample_size: sampleSize,
       age,
       age_group: ageGroup,
       country_id: topCountry.country_id,
+      country_name: topCountry.country_name ?? 'unknown',
       country_probability: topCountry.probability,
     });
 
@@ -156,6 +125,8 @@ export class ProfilesService {
 
   async getAllProfiles(query: any) {
     const qb = this.profileRepo.createQueryBuilder('profile');
+
+    // FILTERS
 
     if (query.gender) {
       qb.andWhere('LOWER(profile.gender) = LOWER(:gender)', {
@@ -175,17 +146,115 @@ export class ProfilesService {
       });
     }
 
-    const profiles = await qb.getMany();
+    if (query.min_age != undefined) {
+      const minAge = Number(query.min_age);
+      if (isNaN(minAge)) {
+        throw new UnprocessableEntityException({
+          status: 'error',
+          message: 'Invalid query parameters',
+        });
+      }
+
+      qb.andWhere('profile.age >= :minAge', {
+        minAge,
+      });
+    }
+
+    if (query.max_age != undefined) {
+      const maxAge = Number(query.max_age);
+      if (isNaN(maxAge)) {
+        throw new UnprocessableEntityException({
+          status: 'error',
+          message: 'Invalid query parameters',
+        });
+      }
+
+      qb.andWhere('profile.age <= :maxAge', {
+        maxAge,
+      });
+    }
+
+    if (query.min_gender_probability) {
+      const minGenderProbability = Number(
+        query.min_gender_probability,
+      );
+
+      if (isNaN(minGenderProbability)) {
+        throw new UnprocessableEntityException({
+          status: 'error',
+          message: 'Invalid query parameters',
+        });
+      }
+
+      qb.andWhere(
+        'profile.gender_probability >= :minGenderProbability',
+        {
+          minGenderProbability,
+        },
+      );
+    }
+
+    if (query.min_country_probability) {
+      const minCountryProbability = Number(
+        query.min_country_probability,
+      );
+
+      if (isNaN(minCountryProbability)) {
+        throw new UnprocessableEntityException({
+          status: 'error',
+          message: 'Invalid query parameters',
+        });
+      }
+
+      qb.andWhere(
+        'profile.country_probability >= :minCountryProbability',
+        {
+          minCountryProbability,
+        },
+      );
+    }
+
+    // SORTING
+
+    const allowedSortFields = [
+      'age',
+      'created_at',
+      'gender_probability',
+    ];
+
+    const sortBy = allowedSortFields.includes(query.sort_by)
+      ? query.sort_by
+      : 'created_at';
+
+    const order =
+      query.order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    qb.orderBy(`profile.${sortBy}`, order);
+
+    // PAGINATION
+
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 10, 50);
+
+    qb.skip((page - 1) * limit).take(limit);
+
+    const [profiles, total] = await qb.getManyAndCount();
 
     return {
       status: 'success',
-      count: profiles.length,
-      data: profiles.map((p) => this.formatList(p)),
+      page,
+      limit,
+      total,
+      data: profiles.map((profile) =>
+        this.formatProfile(profile),
+      ),
     };
   }
 
   async getProfileById(id: string) {
-    const profile = await this.profileRepo.findOne({ where: { id } });
+    const profile = await this.profileRepo.findOne({
+      where: { id },
+    });
 
     if (!profile) {
       throw new NotFoundException({
@@ -201,7 +270,9 @@ export class ProfilesService {
   }
 
   async deleteProfile(id: string) {
-    const profile = await this.profileRepo.findOne({ where: { id } });
+    const profile = await this.profileRepo.findOne({
+      where: { id },
+    });
 
     if (!profile) {
       throw new NotFoundException({
@@ -211,5 +282,10 @@ export class ProfilesService {
     }
 
     await this.profileRepo.remove(profile);
+
+    return {
+      status: 'success',
+      message: 'Profile deleted successfully',
+    };
   }
 }

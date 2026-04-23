@@ -9,10 +9,17 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { ProfilesService } from './profiles.service';
+import { NaturalLanguageParserService } from '../common/natural-language-parser.service';
+import { BadRequestException } from '@nestjs/common';
+
+
 
 @Controller('api/profiles')
 export class ProfilesController {
-  constructor(private readonly profilesService: ProfilesService) {}
+  constructor(
+    private readonly profilesService: ProfilesService,
+    private readonly parser: NaturalLanguageParserService,
+  ) {}
 
   @Post()
   async createProfile(@Body() body: { name: any }) {
@@ -34,4 +41,22 @@ export class ProfilesController {
   async deleteProfile(@Param('id') id: string) {
     await this.profilesService.deleteProfile(id);
   }
+
+  @Get('search')
+    async search(@Query('q') q: string, @Query() query: any) {
+    try {
+        const parsed = this.parser.parse(q);
+
+        return this.profilesService.getAllProfiles({
+        ...query,
+        ...parsed,
+        });
+        } catch (e) {
+            throw new BadRequestException({
+            status: 'error',
+            message: 'Unable to interpret query',
+            });
+        }
+    }
+  
 }
