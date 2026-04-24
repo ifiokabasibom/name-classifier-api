@@ -7,6 +7,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
 import { NaturalLanguageParserService } from './common/natural-language-parser.service';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -16,6 +17,8 @@ import { NaturalLanguageParserService } from './common/natural-language-parser.s
         limit: 10, // max 10 requests
       },
     ]),
+
+    CommonModule,
 
     ConfigModule.forRoot({
       isGlobal: true,
@@ -40,7 +43,7 @@ import { NaturalLanguageParserService } from './common/natural-language-parser.s
     },
   ],
 
-  exports: [NaturalLanguageParserService],
+ // exports: [NaturalLanguageParserService],
 })
 export class AppModule {}
 
