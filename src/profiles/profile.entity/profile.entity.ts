@@ -42,7 +42,7 @@ export class ProfileEntity {
 
   @Index()
   @CreateDateColumn({
-    type: 'timestamp',
+    type: 'date',
   })
   created_at: Date;
 }
