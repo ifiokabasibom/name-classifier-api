@@ -31,17 +31,6 @@ export class ProfilesController {
     return this.profilesService.getAllProfiles(query);
   }
 
-  @Get(':id')
-  async getProfileById(@Param('id') id: string) {
-    return this.profilesService.getProfileById(id);
-  }
-
-  @Delete(':id')
-  @HttpCode(204)
-  async deleteProfile(@Param('id') id: string) {
-    await this.profilesService.deleteProfile(id);
-  }
-
   @Get('search')
     async search(@Query('q') q: string, @Query() query: any) {
     try {
@@ -58,5 +47,33 @@ export class ProfilesController {
             });
         }
     }
+
+  @Get(':id')
+  async getProfileById(@Param('id') id: string) {
+    return this.profilesService.getProfileById(id);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  async deleteProfile(@Param('id') id: string) {
+    await this.profilesService.deleteProfile(id);
+  }
+
+//   @Get('search')
+//     async search(@Query('q') q: string, @Query() query: any) {
+//     try {
+//         const parsed = this.parser.parse(q);
+
+//         return this.profilesService.getAllProfiles({
+//         ...query,
+//         ...parsed,
+//         });
+//         } catch (e) {
+//             throw new BadRequestException({
+//             status: 'error',
+//             message: 'Unable to interpret query',
+//             });
+//         }
+//     }
   
 }
