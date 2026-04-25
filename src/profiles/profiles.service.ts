@@ -36,9 +36,12 @@ export class ProfilesService {
       country_id: profile.country_id,
       country_name: profile.country_name,
       country_probability: profile.country_probability,
-      created_at: profile.created_at.toISOString(),
+      created_at: profile.created_at instanceof Date
+        ? profile.created_at.toISOString()
+        : new Date(profile.created_at).toISOString(),
     };
   }
+
 
   async createProfile(name: any) {
     if (!name) {
@@ -110,8 +113,8 @@ export class ProfilesService {
       gender_probability: genderProbability,
       age,
       age_group: ageGroup,
-      country_id: topCountry.country_id,
-      country_name: topCountry.country_name ?? 'unknown',
+      country_id: topCountry.country_id || topCountry.id || 'unknown',
+      country_name: topCountry.country_name || 'unknown',
       country_probability: topCountry.probability,
     });
 
